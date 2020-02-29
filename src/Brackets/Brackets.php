@@ -2,22 +2,31 @@
 
 namespace App;
 
+use Exception;
+
 class Brackets
 {
     private $data;
 
     public function isValid($data)
     {
-        if (empty($data)) {
-            return('DataIsEmpty');
+        try {
+            if (empty($data)) {
+                $this->response(400);
+                throw new Exception('DataIsEmpty');
+            }
+
+            $this->data = htmlspecialchars($data);
+            $this->AllowedData();
+            echo $this->isEqual();
+
+        } catch (Exception $e) {
+            if ($e->getMessage()) {
+                echo json_encode(Array('result' => 'error', 'msg' => $e->getMessage()));
+            } else {
+                echo json_encode(Array('result' => 'error'));
+            }
         }
-
-        $this->data = htmlspecialchars($data);
-
-        $this->AllowedData();
-
-        return $this->isEqual();
-
     }
 
     private function isEqual()
@@ -25,19 +34,21 @@ class Brackets
         $openBrackets = $this->howManyOpenBrackets();
         $closeBrackets = $this->howManyCloseBrackets();
 
-        if ($openBrackets > $closeBrackets){
-            return '"(" > ")"';
+        if ($openBrackets > $closeBrackets) {
+            $this->response(400);
+            throw new Exception('"(" > ")"');
         } elseif ($openBrackets < $closeBrackets) {
-            return '"(" < ")"';
+            $this->response(400);
+            throw new Exception('"(" < ")"');
         } else {
-            return 'good!';
+            return $this->response(200, 'ok');
         }
 
-        return('ERORR equil');
-
+        $this->response(500);
+        throw new Exception('ServerError');
     }
 
-    private  function AllowedData()
+    private function AllowedData()
     {
         $array = [
             '(',
@@ -48,21 +59,40 @@ class Brackets
             '\r',
         ];
 
-        $data = str_replace($array,'',trim($this->data));
+        $data = str_replace($array, '', trim($this->data));
         if (!empty($data)) {
-            return('InvalidArgumentException');
+            throw new Exception('InvalidArgumentException');
         }
         return true;
     }
 
-    private function howManyOpenBrackets ()
+    private function howManyOpenBrackets()
     {
-        preg_match_all('~\(~',$this->data,$openBrackets);
+        preg_match_all('~\(~', $this->data, $openBrackets);
         return count($openBrackets[0]);
     }
-    private function howManyCloseBrackets ()
+
+    private function howManyCloseBrackets()
     {
-        preg_match_all('~\)~',$this->data,$openBrackets);
+        preg_match_all('~\)~', $this->data, $openBrackets);
         return count($openBrackets[0]);
+    }
+
+    protected function response($status = 500, $data = "")
+    {
+        header("HTTP/1.1 " . $status . " " . $this->requestStatus($status));
+        if (!empty($data)) {
+            return json_encode($data);
+        }
+    }
+
+    private function requestStatus($code)
+    {
+        $status = array(
+            200 => 'OK',
+            400 => 'Bad Reques',
+            500 => 'Internal Server Error',
+        );
+        return ($status[$code]) ? $status[$code] : $status[500];
     }
 }
